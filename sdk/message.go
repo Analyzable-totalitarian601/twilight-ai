@@ -91,6 +91,7 @@ func (p ToolResultPart) PartType() MessagePartType { return MessagePartTypeToolR
 type Message struct {
 	Role    MessageRole   `json:"role"`
 	Content []MessagePart `json:"content"`
+	Usage   *Usage        `json:"-"`
 }
 
 // --- Convenience constructors ---
@@ -133,6 +134,13 @@ func (m Message) MarshalJSON() ([]byte, error) {
 		}
 		parts = append(parts, raw)
 	}
+	if m.Usage != nil {
+		return json.Marshal(struct {
+			Role    MessageRole       `json:"role"`
+			Content []json.RawMessage `json:"content"`
+			Usage   *Usage            `json:"usage,omitempty"`
+		}{Role: m.Role, Content: parts, Usage: m.Usage})
+	}
 	return json.Marshal(struct {
 		Role    MessageRole       `json:"role"`
 		Content []json.RawMessage `json:"content"`
@@ -143,11 +151,13 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Role    MessageRole       `json:"role"`
 		Content []json.RawMessage `json:"content"`
+		Usage   *Usage            `json:"usage,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 	m.Role = raw.Role
+	m.Usage = raw.Usage
 	m.Content = make([]MessagePart, 0, len(raw.Content))
 	for _, r := range raw.Content {
 		p, err := unmarshalPart(r)

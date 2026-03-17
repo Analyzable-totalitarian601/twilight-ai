@@ -99,7 +99,7 @@ func (c *Client) StreamText(ctx context.Context, options ...GenerateOption) (*St
 
 			// No tool calls or not a tool-calls finish → done
 			if lastFinishReason != FinishReasonToolCalls || len(stepToolCalls) == 0 || !hasExecutableTools(stepToolCalls, toolMap) {
-				stepMsgs := buildStepMessages(stepText, stepReasoning, stepToolCalls, nil)
+				stepMsgs := buildStepMessages(stepText, stepReasoning, stepToolCalls, nil, &stepUsage)
 				stepR := StepResult{
 					Text:            stepText,
 					Reasoning:       stepReasoning,
@@ -124,7 +124,7 @@ func (c *Client) StreamText(ctx context.Context, options ...GenerateOption) (*St
 				break
 			}
 
-			stepMsgs := buildStepMessages(stepText, stepReasoning, stepToolCalls, toolResults)
+			stepMsgs := buildStepMessages(stepText, stepReasoning, stepToolCalls, toolResults, &stepUsage)
 			stepR := StepResult{
 				Text:            stepText,
 				Reasoning:       stepReasoning,
