@@ -11,7 +11,14 @@ import (
 	"github.com/memohai/twilight-ai/sdk"
 )
 
-const defaultBaseURL = "https://api.openai.com/v1"
+const (
+	defaultBaseURL = "https://api.openai.com/v1"
+
+	// Output item types for OpenAI Responses API
+	outputTypeMessage      = "message"
+	outputTypeReasoning    = "reasoning"
+	outputTypeFunctionCall = "function_call"
+)
 
 type Provider struct {
 	apiKey     string
@@ -58,14 +65,14 @@ func (p *Provider) ChatModel(id string) *sdk.Model {
 
 // ---------- DoGenerate ----------
 
-func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*sdk.GenerateResult, error) {
+func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*sdk.GenerateResult, error) { //nolint:gocritic // interface method
 	if params.Model == nil {
 		return nil, fmt.Errorf("openai-responses: model is required")
 	}
 
-	req := p.buildRequest(params)
+	req := p.buildRequest(&params)
 
-	resp, err := utils.FetchJSON[responsesResponse](ctx, p.httpClient, utils.RequestOptions{
+	resp, err := utils.FetchJSON[responsesResponse](ctx, p.httpClient, &utils.RequestOptions{
 		Method:  http.MethodPost,
 		BaseURL: p.baseURL,
 		Path:    "/responses",
@@ -85,7 +92,7 @@ func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*
 
 // ---------- buildRequest ----------
 
-func (p *Provider) buildRequest(params sdk.GenerateParams) *responsesRequest {
+func (p *Provider) buildRequest(params *sdk.GenerateParams) *responsesRequest {
 	req := &responsesRequest{
 		Model:           params.Model.ID,
 		Input:           convertToResponsesInput(params),
@@ -138,7 +145,7 @@ func convertResponsesTools(tools []sdk.Tool) []responsesTool {
 
 // ---------- input conversion ----------
 
-func convertToResponsesInput(params sdk.GenerateParams) []json.RawMessage {
+func convertToResponsesInput(params *sdk.GenerateParams) []json.RawMessage {
 	var items []json.RawMessage
 
 	if params.System != "" {
@@ -285,9 +292,10 @@ func (p *Provider) parseResponse(resp *responsesResponse) (*sdk.GenerateResult, 
 		incompleteReason = resp.IncompleteDetails.Reason
 	}
 
-	for _, item := range resp.Output {
+	for i := range resp.Output {
+		item := &resp.Output[i]
 		switch item.Type {
-		case "message":
+		case outputTypeMessage:
 			for _, c := range item.Content {
 				if c.Type == "output_text" {
 					result.Text += c.Text
@@ -304,14 +312,14 @@ func (p *Provider) parseResponse(resp *responsesResponse) (*sdk.GenerateResult, 
 				}
 			}
 
-		case "reasoning":
+		case outputTypeReasoning:
 			for _, s := range item.Summary {
 				if s.Type == "summary_text" {
 					result.Reasoning += s.Text
 				}
 			}
 
-		case "function_call":
+		case outputTypeFunctionCall:
 			hasFunctionCall = true
 			var input any
 			if err := json.Unmarshal([]byte(item.Arguments), &input); err != nil {
@@ -339,12 +347,12 @@ func (p *Provider) parseResponse(resp *responsesResponse) (*sdk.GenerateResult, 
 
 // ---------- DoStream ----------
 
-func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sdk.StreamResult, error) {
+func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sdk.StreamResult, error) { //nolint:gocritic,gocyclo // interface method
 	if params.Model == nil {
 		return nil, fmt.Errorf("openai-responses: model is required")
 	}
 
-	req := p.buildRequest(params)
+	req := p.buildRequest(&params)
 	req.Stream = true
 
 	ch := make(chan sdk.StreamPart, 64)
@@ -394,7 +402,7 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 			return
 		}
 
-		err := utils.FetchSSE(ctx, p.httpClient, utils.RequestOptions{
+		err := utils.FetchSSE(ctx, p.httpClient, &utils.RequestOptions{
 			Method:  http.MethodPost,
 			BaseURL: p.baseURL,
 			Path:    "/responses",
@@ -428,17 +436,17 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 					return nil
 				}
 				switch chunk.Item.Type {
-				case "message":
+				case outputTypeMessage:
 					if !textStartSent {
 						send(&sdk.TextStartPart{ID: chunk.Item.ID})
 						textStartSent = true
 					}
-				case "reasoning":
+				case outputTypeReasoning:
 					if !reasoningStartSent {
 						send(&sdk.ReasoningStartPart{ID: chunk.Item.ID})
 						reasoningStartSent = true
 					}
-				case "function_call":
+				case outputTypeFunctionCall:
 					if reasoningStartSent {
 						send(&sdk.ReasoningEndPart{ID: responseID})
 						reasoningStartSent = false
@@ -508,17 +516,17 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 					return nil
 				}
 				switch chunk.Item.Type {
-				case "message":
+				case outputTypeMessage:
 					if textStartSent {
 						send(&sdk.TextEndPart{ID: chunk.Item.ID})
 						textStartSent = false
 					}
-				case "reasoning":
+				case outputTypeReasoning:
 					if reasoningStartSent {
 						send(&sdk.ReasoningEndPart{ID: chunk.Item.ID})
 						reasoningStartSent = false
 					}
-				case "function_call":
+				case outputTypeFunctionCall:
 					hasFunctionCall = true
 					stc := pendingToolCalls[chunk.OutputIndex]
 					if stc != nil && !stc.finished {

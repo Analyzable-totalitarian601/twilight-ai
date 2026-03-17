@@ -68,7 +68,7 @@ func (c *Client) GenerateTextResult(ctx context.Context, options ...GenerateOpti
 			return nil, err
 		}
 		lastResult = result
-		totalUsage = addUsage(totalUsage, result.Usage)
+		totalUsage = addUsage(&totalUsage, &result.Usage)
 
 		// No tool calls or not a tool-calls finish → final step
 		if result.FinishReason != FinishReasonToolCalls || len(result.ToolCalls) == 0 || !hasExecutableTools(result.ToolCalls, toolMap) {

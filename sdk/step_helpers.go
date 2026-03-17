@@ -30,18 +30,19 @@ func shouldContinueLoop(maxSteps, step int) bool {
 	return step < maxSteps
 }
 
-func addUsage(total, step Usage) Usage {
-	total.InputTokens += step.InputTokens
-	total.OutputTokens += step.OutputTokens
-	total.TotalTokens += step.TotalTokens
-	total.ReasoningTokens += step.ReasoningTokens
-	total.CachedInputTokens += step.CachedInputTokens
-	total.InputTokenDetails.NoCacheTokens += step.InputTokenDetails.NoCacheTokens
-	total.InputTokenDetails.CacheReadTokens += step.InputTokenDetails.CacheReadTokens
-	total.InputTokenDetails.CacheWriteTokens += step.InputTokenDetails.CacheWriteTokens
-	total.OutputTokenDetails.TextTokens += step.OutputTokenDetails.TextTokens
-	total.OutputTokenDetails.ReasoningTokens += step.OutputTokenDetails.ReasoningTokens
-	return total
+func addUsage(total, step *Usage) Usage {
+	result := *total
+	result.InputTokens += step.InputTokens
+	result.OutputTokens += step.OutputTokens
+	result.TotalTokens += step.TotalTokens
+	result.ReasoningTokens += step.ReasoningTokens
+	result.CachedInputTokens += step.CachedInputTokens
+	result.InputTokenDetails.NoCacheTokens += step.InputTokenDetails.NoCacheTokens
+	result.InputTokenDetails.CacheReadTokens += step.InputTokenDetails.CacheReadTokens
+	result.InputTokenDetails.CacheWriteTokens += step.InputTokenDetails.CacheWriteTokens
+	result.OutputTokenDetails.TextTokens += step.OutputTokenDetails.TextTokens
+	result.OutputTokenDetails.ReasoningTokens += step.OutputTokenDetails.ReasoningTokens
+	return result
 }
 
 // buildStepMessages creates the messages produced by a step: an assistant
@@ -55,11 +56,7 @@ func buildStepMessages(text, reasoning string, toolCalls []ToolCall, toolResults
 		assistantParts = append(assistantParts, ReasoningPart{Text: reasoning})
 	}
 	for _, tc := range toolCalls {
-		assistantParts = append(assistantParts, ToolCallPart{
-			ToolCallID: tc.ToolCallID,
-			ToolName:   tc.ToolName,
-			Input:      tc.Input,
-		})
+		assistantParts = append(assistantParts, ToolCallPart(tc))
 	}
 
 	msgs := []Message{{Role: MessageRoleAssistant, Content: assistantParts}}

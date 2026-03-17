@@ -33,7 +33,7 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("api error %d: %s", e.StatusCode, e.Status)
 }
 
-func BuildRequest(ctx context.Context, opts RequestOptions) (*http.Request, error) {
+func BuildRequest(ctx context.Context, opts *RequestOptions) (*http.Request, error) {
 	fullURL, err := buildURL(opts.BaseURL, opts.Path, opts.Query)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func BuildRequest(ctx context.Context, opts RequestOptions) (*http.Request, erro
 
 // FetchJSON sends a JSON request and decodes the response into type T.
 // Non-2xx responses are returned as *APIError.
-func FetchJSON[T any](ctx context.Context, client *http.Client, opts RequestOptions) (*T, error) {
+func FetchJSON[T any](ctx context.Context, client *http.Client, opts *RequestOptions) (*T, error) {
 	if opts.Headers == nil {
 		opts.Headers = make(map[string]string)
 	}
@@ -108,7 +108,7 @@ func FetchJSON[T any](ctx context.Context, client *http.Client, opts RequestOpti
 // FetchRaw sends a request and returns the raw *http.Response.
 // The caller is responsible for closing the response body.
 // Non-2xx responses are returned as *APIError (body already closed).
-func FetchRaw(ctx context.Context, client *http.Client, opts RequestOptions) (*http.Response, error) {
+func FetchRaw(ctx context.Context, client *http.Client, opts *RequestOptions) (*http.Response, error) {
 	req, err := BuildRequest(ctx, opts)
 	if err != nil {
 		return nil, err

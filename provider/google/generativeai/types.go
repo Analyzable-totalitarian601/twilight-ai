@@ -102,14 +102,6 @@ type candidate struct {
 	SafetyRatings []safetyRating `json:"safetyRatings,omitempty"`
 }
 
-type responsePart struct {
-	Text             *string       `json:"text,omitempty"`
-	FunctionCall     *functionCall `json:"functionCall,omitempty"`
-	InlineData       *inlineData   `json:"inlineData,omitempty"`
-	Thought          *bool         `json:"thought,omitempty"`
-	ThoughtSignature string        `json:"thoughtSignature,omitempty"`
-}
-
 type usageMetadata struct {
 	PromptTokenCount        int `json:"promptTokenCount"`
 	CandidatesTokenCount    int `json:"candidatesTokenCount"`

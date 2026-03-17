@@ -749,13 +749,13 @@ func TestClient_StreamText_ApprovalFlow(t *testing.T) {
 
 	var gotApprovalReq, gotDenied bool
 	for part := range sr.Stream {
-		switch part.(type) {
+		switch p := part.(type) {
 		case *sdk.ToolApprovalRequestPart:
 			gotApprovalReq = true
 		case *sdk.ToolOutputDeniedPart:
 			gotDenied = true
 		case *sdk.ErrorPart:
-			t.Fatalf("stream error: %v", part.(*sdk.ErrorPart).Error)
+			t.Fatalf("stream error: %v", p.Error)
 		}
 	}
 

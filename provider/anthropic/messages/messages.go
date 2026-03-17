@@ -14,6 +14,11 @@ import (
 const (
 	defaultBaseURL      = "https://api.anthropic.com"
 	defaultAnthropicVer = "2023-06-01"
+
+	// Content block types for Anthropic API
+	blockTypeText      = "text"
+	blockTypeThinking  = "thinking"
+	blockTypeToolUse   = "tool_use"
 )
 
 // ThinkingConfig controls extended thinking for Anthropic models.
@@ -118,14 +123,14 @@ func (p *Provider) requestHeaders() map[string]string {
 
 // ---------- DoGenerate ----------
 
-func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*sdk.GenerateResult, error) {
+func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*sdk.GenerateResult, error) { //nolint:gocritic // interface method
 	if params.Model == nil {
 		return nil, fmt.Errorf("anthropic: model is required")
 	}
 
-	req := p.buildRequest(params)
+	req := p.buildRequest(&params)
 
-	resp, err := utils.FetchJSON[messagesResponse](ctx, p.httpClient, utils.RequestOptions{
+	resp, err := utils.FetchJSON[messagesResponse](ctx, p.httpClient, &utils.RequestOptions{
 		Method:  http.MethodPost,
 		BaseURL: p.baseURL,
 		Path:    "/v1/messages",
@@ -141,7 +146,7 @@ func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*
 
 // ---------- buildRequest ----------
 
-func (p *Provider) buildRequest(params sdk.GenerateParams) *messagesRequest {
+func (p *Provider) buildRequest(params *sdk.GenerateParams) *messagesRequest {
 	system, messages := convertMessages(params)
 
 	req := &messagesRequest{
@@ -217,12 +222,12 @@ func convertToolChoice(choice any) *anthropicToolChoice {
 // convertMessages splits SDK messages into Anthropic's system blocks and
 // alternating user/assistant messages. Tool result messages are merged into
 // user messages, as required by the Anthropic API.
-func convertMessages(params sdk.GenerateParams) ([]contentBlock, []anthropicMessage) {
+func convertMessages(params *sdk.GenerateParams) ([]contentBlock, []anthropicMessage) {
 	var system []contentBlock
 	var out []anthropicMessage
 
 	if params.System != "" {
-		system = append(system, contentBlock{Type: "text", Text: params.System})
+		system = append(system, contentBlock{Type: blockTypeText, Text: params.System})
 	}
 
 	for _, msg := range params.Messages {
@@ -230,7 +235,7 @@ func convertMessages(params sdk.GenerateParams) ([]contentBlock, []anthropicMess
 		case sdk.MessageRoleSystem:
 			for _, part := range msg.Content {
 				if tp, ok := part.(sdk.TextPart); ok {
-					system = append(system, contentBlock{Type: "text", Text: tp.Text})
+					system = append(system, contentBlock{Type: blockTypeText, Text: tp.Text})
 				}
 			}
 
@@ -268,7 +273,7 @@ func convertUserContent(parts []sdk.MessagePart) []contentBlock {
 	for _, part := range parts {
 		switch p := part.(type) {
 		case sdk.TextPart:
-			blocks = append(blocks, contentBlock{Type: "text", Text: p.Text})
+			blocks = append(blocks, contentBlock{Type: blockTypeText, Text: p.Text})
 		case sdk.ImagePart:
 			blocks = append(blocks, contentBlock{
 				Type: "image",
@@ -279,7 +284,7 @@ func convertUserContent(parts []sdk.MessagePart) []contentBlock {
 				},
 			})
 		case sdk.FilePart:
-			blocks = append(blocks, contentBlock{Type: "text", Text: p.Data})
+			blocks = append(blocks, contentBlock{Type: blockTypeText, Text: p.Data})
 		}
 	}
 	return blocks
@@ -291,10 +296,10 @@ func convertAssistantMessage(msg sdk.Message) anthropicMessage {
 	for _, part := range msg.Content {
 		switch p := part.(type) {
 		case sdk.TextPart:
-			blocks = append(blocks, contentBlock{Type: "text", Text: p.Text})
+			blocks = append(blocks, contentBlock{Type: blockTypeText, Text: p.Text})
 		case sdk.ReasoningPart:
 			blocks = append(blocks, contentBlock{
-				Type:      "thinking",
+				Type:      blockTypeThinking,
 				Thinking:  p.Text,
 				Signature: p.Signature,
 			})
@@ -304,7 +309,7 @@ func convertAssistantMessage(msg sdk.Message) anthropicMessage {
 				id = generateID()
 			}
 			blocks = append(blocks, contentBlock{
-				Type:  "tool_use",
+				Type:  blockTypeToolUse,
 				ID:    id,
 				Name:  p.ToolName,
 				Input: p.Input,
@@ -345,15 +350,16 @@ func (p *Provider) parseResponse(resp *messagesResponse) (*sdk.GenerateResult, e
 		},
 	}
 
-	for _, block := range resp.Content {
+	for i := range resp.Content {
+		block := &resp.Content[i]
 		switch block.Type {
-		case "text":
+		case blockTypeText:
 			result.Text += block.Text
-		case "thinking":
+		case blockTypeThinking:
 			result.Reasoning += block.Thinking
 		case "redacted_thinking":
 			// Redacted thinking blocks don't contain readable text
-		case "tool_use":
+		case blockTypeToolUse:
 			result.ToolCalls = append(result.ToolCalls, sdk.ToolCall{
 				ToolCallID: block.ID,
 				ToolName:   block.Name,
@@ -367,12 +373,12 @@ func (p *Provider) parseResponse(resp *messagesResponse) (*sdk.GenerateResult, e
 
 // ---------- DoStream ----------
 
-func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sdk.StreamResult, error) {
+func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sdk.StreamResult, error) { //nolint:gocritic // interface method
 	if params.Model == nil {
 		return nil, fmt.Errorf("anthropic: model is required")
 	}
 
-	req := p.buildRequest(params)
+	req := p.buildRequest(&params)
 	req.Stream = true
 
 	ch := make(chan sdk.StreamPart, 64)
@@ -407,7 +413,7 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 			return
 		}
 
-		err := utils.FetchSSE(ctx, p.httpClient, utils.RequestOptions{
+		err := utils.FetchSSE(ctx, p.httpClient, &utils.RequestOptions{
 			Method:  http.MethodPost,
 			BaseURL: p.baseURL,
 			Path:    "/v1/messages",
@@ -435,15 +441,15 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 				idx := *event.Index
 				cb := event.ContentBlock
 				switch cb.Type {
-				case "text":
-					activeBlocks[idx] = &streamingBlock{blockType: "text"}
+				case blockTypeText:
+					activeBlocks[idx] = &streamingBlock{blockType: blockTypeText}
 					send(&sdk.TextStartPart{ID: messageID})
-				case "thinking":
-					activeBlocks[idx] = &streamingBlock{blockType: "thinking"}
+				case blockTypeThinking:
+					activeBlocks[idx] = &streamingBlock{blockType: blockTypeThinking}
 					send(&sdk.ReasoningStartPart{ID: messageID})
-				case "tool_use":
+				case blockTypeToolUse:
 					activeBlocks[idx] = &streamingBlock{
-						blockType:  "tool_use",
+						blockType:  blockTypeToolUse,
 						toolID:     cb.ID,
 						toolName:   cb.Name,
 					}
@@ -490,11 +496,11 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 				delete(activeBlocks, idx)
 
 				switch sb.blockType {
-				case "text":
+				case blockTypeText:
 					send(&sdk.TextEndPart{ID: messageID})
-				case "thinking":
+				case blockTypeThinking:
 					send(&sdk.ReasoningEndPart{ID: messageID})
-				case "tool_use":
+				case blockTypeToolUse:
 					send(&sdk.ToolInputEndPart{ID: sb.toolID})
 					var input any
 					if sb.args != "" {

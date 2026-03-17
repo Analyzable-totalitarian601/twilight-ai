@@ -95,7 +95,7 @@ func (c *Client) StreamText(ctx context.Context, options ...GenerateOption) (*St
 				}
 			}
 
-			totalUsage = addUsage(totalUsage, stepUsage)
+			totalUsage = addUsage(&totalUsage, &stepUsage)
 
 			// No tool calls or not a tool-calls finish → done
 			if lastFinishReason != FinishReasonToolCalls || len(stepToolCalls) == 0 || !hasExecutableTools(stepToolCalls, toolMap) {

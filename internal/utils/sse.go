@@ -35,7 +35,7 @@ type SSEEvent struct {
 //	    // process chunk ...
 //	    return nil
 //	})
-func FetchSSE(ctx context.Context, client *http.Client, opts RequestOptions, onEvent func(*SSEEvent) error) error {
+func FetchSSE(ctx context.Context, client *http.Client, opts *RequestOptions, onEvent func(*SSEEvent) error) error {
 	if opts.Headers == nil {
 		opts.Headers = make(map[string]string)
 	}

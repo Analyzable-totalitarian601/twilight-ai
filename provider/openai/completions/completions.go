@@ -69,14 +69,14 @@ func (p *Provider) ChatModel(id string) *sdk.Model {
 
 // ---------- DoGenerate ----------
 
-func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*sdk.GenerateResult, error) {
+func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*sdk.GenerateResult, error) { //nolint:gocritic // interface method
 	if params.Model == nil {
 		return nil, fmt.Errorf("openai: model is required")
 	}
 
-	req := p.buildRequest(params)
+	req := p.buildRequest(&params)
 
-	resp, err := utils.FetchJSON[chatResponse](ctx, p.httpClient, utils.RequestOptions{
+	resp, err := utils.FetchJSON[chatResponse](ctx, p.httpClient, &utils.RequestOptions{
 		Method:  http.MethodPost,
 		BaseURL: p.baseURL,
 		Path:    "/chat/completions",
@@ -92,7 +92,7 @@ func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*
 
 // ---------- buildRequest ----------
 
-func (p *Provider) buildRequest(params sdk.GenerateParams) *chatRequest {
+func (p *Provider) buildRequest(params *sdk.GenerateParams) *chatRequest {
 	req := &chatRequest{
 		Model:               params.Model.ID,
 		Messages:            convertMessages(params),
@@ -137,7 +137,7 @@ func convertTools(tools []sdk.Tool) []chatTool {
 
 // ---------- message conversion ----------
 
-func convertMessages(params sdk.GenerateParams) []chatMessage {
+func convertMessages(params *sdk.GenerateParams) []chatMessage {
 	var out []chatMessage
 
 	if params.System != "" {
@@ -267,7 +267,7 @@ func (p *Provider) parseResponse(resp *chatResponse) (*sdk.GenerateResult, error
 	if len(resp.Choices) > 0 {
 		choice := resp.Choices[0]
 		result.Text = choice.Message.Content
-		result.Reasoning = reasoningFromMessage(choice.Message)
+		result.Reasoning = reasoningFromMessage(&choice.Message)
 		result.FinishReason = mapFinishReason(choice.FinishReason)
 		result.RawFinishReason = choice.FinishReason
 
@@ -293,12 +293,12 @@ func (p *Provider) parseResponse(resp *chatResponse) (*sdk.GenerateResult, error
 
 // ---------- DoStream ----------
 
-func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sdk.StreamResult, error) {
+func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sdk.StreamResult, error) { //nolint:gocritic // interface method
 	if params.Model == nil {
 		return nil, fmt.Errorf("openai: model is required")
 	}
 
-	req := p.buildRequest(params)
+	req := p.buildRequest(&params)
 	req.Stream = true
 	req.StreamOptions = &chatStreamOptions{IncludeUsage: true}
 
@@ -367,7 +367,7 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 			return
 		}
 
-		err := utils.FetchSSE(ctx, p.httpClient, utils.RequestOptions{
+		err := utils.FetchSSE(ctx, p.httpClient, &utils.RequestOptions{
 			Method:  http.MethodPost,
 			BaseURL: p.baseURL,
 			Path:    "/chat/completions",
@@ -399,7 +399,7 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 			}
 			choice := chunk.Choices[0]
 
-			reasoningContent := reasoningFromDelta(choice.Delta)
+			reasoningContent := reasoningFromDelta(&choice.Delta)
 			if reasoningContent != "" {
 				if !reasoningStartSent {
 					send(&sdk.ReasoningStartPart{ID: chunk.ID})
@@ -515,14 +515,14 @@ type streamingToolCall struct {
 
 // ---------- helpers ----------
 
-func reasoningFromMessage(m chatRespMessage) string {
+func reasoningFromMessage(m *chatRespMessage) string {
 	if m.ReasoningContent != "" {
 		return m.ReasoningContent
 	}
 	return m.Reasoning
 }
 
-func reasoningFromDelta(d chatChunkDelta) string {
+func reasoningFromDelta(d *chatChunkDelta) string {
 	if d.ReasoningContent != "" {
 		return d.ReasoningContent
 	}

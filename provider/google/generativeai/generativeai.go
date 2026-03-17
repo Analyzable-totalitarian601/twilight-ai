@@ -69,15 +69,15 @@ func (p *Provider) ChatModel(id string) *sdk.Model {
 
 // ---------- DoGenerate ----------
 
-func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*sdk.GenerateResult, error) {
+func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*sdk.GenerateResult, error) { //nolint:gocritic // interface method
 	if params.Model == nil {
 		return nil, fmt.Errorf("google: model is required")
 	}
 
-	req := p.buildRequest(params)
+	req := p.buildRequest(&params)
 	modelPath := getModelPath(params.Model.ID)
 
-	resp, err := utils.FetchJSON[generateResponse](ctx, p.httpClient, utils.RequestOptions{
+	resp, err := utils.FetchJSON[generateResponse](ctx, p.httpClient, &utils.RequestOptions{
 		Method:  http.MethodPost,
 		BaseURL: p.baseURL,
 		Path:    "/" + modelPath + ":generateContent",
@@ -93,7 +93,7 @@ func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*
 
 // ---------- buildRequest ----------
 
-func (p *Provider) buildRequest(params sdk.GenerateParams) *generateRequest {
+func (p *Provider) buildRequest(params *sdk.GenerateParams) *generateRequest {
 	contents, sysInstruction := convertMessages(params)
 
 	req := &generateRequest{
@@ -134,8 +134,8 @@ func (p *Provider) buildRequest(params sdk.GenerateParams) *generateRequest {
 
 // ---------- message conversion ----------
 
-func convertMessages(params sdk.GenerateParams) ([]content, *content) {
-	var contents []content
+func convertMessages(params *sdk.GenerateParams) ([]content, *content) { //nolint:gocritic // unnamed results are clear in context
+	contents := make([]content, 0, len(params.Messages))
 	var sysInstruction *content
 
 	if params.System != "" {
@@ -302,7 +302,8 @@ func (p *Provider) parseResponse(resp *generateResponse) (*sdk.GenerateResult, e
 
 	if candidate.Content != nil {
 		for _, part := range candidate.Content.Parts {
-			if part.FunctionCall != nil {
+			switch {
+			case part.FunctionCall != nil:
 				hasToolCalls = true
 				id := generateID()
 				argsJSON, err := json.Marshal(part.FunctionCall.Args)
@@ -318,14 +319,14 @@ func (p *Provider) parseResponse(resp *generateResponse) (*sdk.GenerateResult, e
 					ToolName:   part.FunctionCall.Name,
 					Input:      input,
 				})
-			} else if part.Text != "" {
+			case part.Text != "":
 				isThought := part.Thought != nil && *part.Thought
 				if isThought {
 					result.Reasoning += part.Text
 				} else {
 					result.Text += part.Text
 				}
-			} else if part.InlineData != nil {
+			case part.InlineData != nil:
 				result.Files = append(result.Files, sdk.GeneratedFile{
 					Data:      part.InlineData.Data,
 					MediaType: part.InlineData.MimeType,
@@ -342,12 +343,12 @@ func (p *Provider) parseResponse(resp *generateResponse) (*sdk.GenerateResult, e
 
 // ---------- DoStream ----------
 
-func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sdk.StreamResult, error) {
+func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sdk.StreamResult, error) { //nolint:gocritic // interface method
 	if params.Model == nil {
 		return nil, fmt.Errorf("google: model is required")
 	}
 
-	req := p.buildRequest(params)
+	req := p.buildRequest(&params)
 	modelPath := getModelPath(params.Model.ID)
 
 	ch := make(chan sdk.StreamPart, 64)
@@ -399,7 +400,7 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 			return
 		}
 
-		err := utils.FetchSSE(ctx, p.httpClient, utils.RequestOptions{
+		err := utils.FetchSSE(ctx, p.httpClient, &utils.RequestOptions{
 			Method:  http.MethodPost,
 			BaseURL: p.baseURL,
 			Path:    "/" + modelPath + ":streamGenerateContent",
@@ -424,7 +425,8 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 
 			if candidate.Content != nil {
 				for _, part := range candidate.Content.Parts {
-					if part.FunctionCall != nil {
+					switch {
+					case part.FunctionCall != nil:
 						if reasoningStartSent {
 							send(&sdk.ReasoningEndPart{ID: currentReasoningID})
 							reasoningStartSent = false
@@ -450,14 +452,16 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 						send(&sdk.ToolInputEndPart{ID: toolCallID})
 
 						var input any
-						json.Unmarshal(argsJSON, &input)
+						if err := json.Unmarshal(argsJSON, &input); err != nil {
+							_ = err // unmarshal failed, input remains nil
+						}
 
 						send(&sdk.StreamToolCallPart{
 							ToolCallID: toolCallID,
 							ToolName:   part.FunctionCall.Name,
 							Input:      input,
 						})
-					} else if part.Text != "" {
+					case part.Text != "":
 						isThought := part.Thought != nil && *part.Thought
 						if isThought {
 							if textStartSent {
@@ -484,7 +488,7 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 							}
 							send(&sdk.TextDeltaPart{ID: currentTextID, Text: part.Text})
 						}
-					} else if part.InlineData != nil {
+					case part.InlineData != nil:
 						if textStartSent {
 							send(&sdk.TextEndPart{ID: currentTextID})
 							textStartSent = false

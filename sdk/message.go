@@ -97,7 +97,8 @@ type Message struct {
 
 // UserMessage creates a user message with one or more text parts.
 func UserMessage(text string, extra ...MessagePart) Message {
-	parts := []MessagePart{TextPart{Text: text}}
+	parts := make([]MessagePart, 0, 1+len(extra))
+	parts = append(parts, TextPart{Text: text})
 	parts = append(parts, extra...)
 	return Message{Role: MessageRoleUser, Content: parts}
 }
@@ -170,8 +171,12 @@ func marshalPart(p MessagePart) (json.RawMessage, error) {
 
 	// merge {"type":"..."} into the part's JSON
 	merged := make(map[string]json.RawMessage)
-	json.Unmarshal(typeJSON, &merged)
-	json.Unmarshal(base, &merged)
+	if err := json.Unmarshal(typeJSON, &merged); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(base, &merged); err != nil {
+		return nil, err
+	}
 	return json.Marshal(merged)
 }
 
@@ -185,22 +190,40 @@ func unmarshalPart(data json.RawMessage) (MessagePart, error) {
 	switch probe.Type {
 	case MessagePartTypeText:
 		var p TextPart
-		return p, json.Unmarshal(data, &p)
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return p, nil
 	case MessagePartTypeReasoning:
 		var p ReasoningPart
-		return p, json.Unmarshal(data, &p)
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return p, nil
 	case MessagePartTypeImage:
 		var p ImagePart
-		return p, json.Unmarshal(data, &p)
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return p, nil
 	case MessagePartTypeFile:
 		var p FilePart
-		return p, json.Unmarshal(data, &p)
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return p, nil
 	case MessagePartTypeToolCall:
 		var p ToolCallPart
-		return p, json.Unmarshal(data, &p)
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return p, nil
 	case MessagePartTypeToolResult:
 		var p ToolResultPart
-		return p, json.Unmarshal(data, &p)
+		if err := json.Unmarshal(data, &p); err != nil {
+			return nil, err
+		}
+		return p, nil
 	default:
 		return nil, fmt.Errorf("unknown message part type: %q", probe.Type)
 	}
