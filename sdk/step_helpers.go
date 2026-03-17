@@ -50,11 +50,11 @@ func addUsage(total, step *Usage) Usage {
 // The usage is attached to the assistant message for output tracking.
 func buildStepMessages(text, reasoning string, toolCalls []ToolCall, toolResults []ToolResultPart, usage *Usage) []Message {
 	var assistantParts []MessagePart
-	if text != "" {
-		assistantParts = append(assistantParts, TextPart{Text: text})
-	}
 	if reasoning != "" {
 		assistantParts = append(assistantParts, ReasoningPart{Text: reasoning})
+	}
+	if text != "" {
+		assistantParts = append(assistantParts, TextPart{Text: text})
 	}
 	for _, tc := range toolCalls {
 		assistantParts = append(assistantParts, ToolCallPart(tc))
