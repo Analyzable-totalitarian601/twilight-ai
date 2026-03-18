@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultBaseURL      = "https://api.anthropic.com"
+	defaultBaseURL      = "https://api.anthropic.com/v1"
 	defaultAnthropicVer = "2023-06-01"
 
 	// Content block types for Anthropic API
@@ -133,7 +133,7 @@ func (p *Provider) DoGenerate(ctx context.Context, params sdk.GenerateParams) (*
 	resp, err := utils.FetchJSON[messagesResponse](ctx, p.httpClient, &utils.RequestOptions{
 		Method:  http.MethodPost,
 		BaseURL: p.baseURL,
-		Path:    "/v1/messages",
+		Path:    "/messages",
 		Headers: p.requestHeaders(),
 		Body:    req,
 	})
@@ -416,7 +416,7 @@ func (p *Provider) DoStream(ctx context.Context, params sdk.GenerateParams) (*sd
 		err := utils.FetchSSE(ctx, p.httpClient, &utils.RequestOptions{
 			Method:  http.MethodPost,
 			BaseURL: p.baseURL,
-			Path:    "/v1/messages",
+			Path:    "/messages",
 			Headers: p.requestHeaders(),
 			Body:    req,
 		}, func(ev *utils.SSEEvent) error {
